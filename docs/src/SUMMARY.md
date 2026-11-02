@@ -11,6 +11,7 @@
 # Working with Code
 
 - [Windows & Projects](./windows-and-projects.md)
+- [Disabling Auto-Scanning](./disabling-auto-scanning.md)
 - [Editing Code](./editing-code.md)
   - [Code Completions](./completions.md)
   - [Snippets](./snippets.md)

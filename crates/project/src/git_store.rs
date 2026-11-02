@@ -907,7 +907,7 @@ impl GitStore {
         fs: Arc<dyn Fs>,
         cx: &mut Context<Self>,
     ) -> Self {
-        let _fs_watches = if fs.is_fake() {
+        let _fs_watches = if !worktree_store.read(cx).is_scanning_enabled() || fs.is_fake() {
             Box::new([])
         } else {
             [
@@ -2546,6 +2546,9 @@ impl GitStore {
         fs: Arc<dyn Fs>,
         cx: &mut Context<Self>,
     ) {
+        if !self.worktree_store.read(cx).is_scanning_enabled() {
+            return;
+        }
         let mut removed_ids = Vec::new();
 
         let is_trusted = TrustedWorktrees::try_get_global(cx)
@@ -10076,6 +10079,13 @@ impl Repository {
         updates_tx: Option<mpsc::UnboundedSender<DownstreamUpdate>>,
         cx: &mut Context<Self>,
     ) {
+        if self
+            .git_store
+            .upgrade()
+            .is_some_and(|git_store| !git_store.read(cx).worktree_store.read(cx).is_scanning_enabled())
+        {
+            return;
+        }
         let this = cx.weak_entity();
         let _ = self.send_keyed_job(
             "schedule_scan",

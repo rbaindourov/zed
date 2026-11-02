@@ -767,16 +767,15 @@ impl NativeAgent {
             return;
         }
 
-        // Skills directory exists. Start a watch and trigger a refresh
-        // of every project's context so the freshly-discovered skills
-        // get loaded.
         let _ = this.update(cx, |this, cx| {
-            cx.spawn({
-                let fs = fs.clone();
-                let skills_dir = skills_dir.clone();
-                async move |this, cx| Self::run_skills_watch(this, fs, skills_dir, cx).await
-            })
-            .detach();
+            if fs.is_fake() {
+                cx.spawn({
+                    let fs = fs.clone();
+                    let skills_dir = skills_dir.clone();
+                    async move |this, cx| Self::run_skills_watch(this, fs, skills_dir, cx).await
+                })
+                .detach();
+            }
             this.skills_state = SkillsState::Watching;
             for state in this.projects.values_mut() {
                 state.project_context_needs_refresh.send(()).ok();

@@ -5018,7 +5018,7 @@ impl LspStore {
                 buffer_pull_diagnostics_result_ids: HashMap::default(),
                 workspace_pull_diagnostics_result_ids: HashMap::default(),
                 restricted_worktrees_tasks: HashMap::default(),
-                auto_start_language_servers: true,
+                auto_start_language_servers: worktree_store.read(cx).is_scanning_enabled(),
                 language_server_start_overrides: HashMap::default(),
                 language_server_restart_tasks: Vec::new(),
                 watched_manifest_filenames: ManifestProvidersStore::global(cx)
@@ -5304,8 +5304,10 @@ impl LspStore {
         })
         .detach();
 
-        self.parse_modeline(buffer, cx);
-        self.detect_language_for_buffer(buffer, cx);
+        if self.worktree_store.read(cx).is_scanning_enabled() {
+            self.parse_modeline(buffer, cx);
+            self.detect_language_for_buffer(buffer, cx);
+        }
         if let Some(local) = self.as_local_mut() {
             local.initialize_buffer(buffer, cx);
         }
@@ -5669,6 +5671,9 @@ impl LspStore {
         buffer_handle: &Entity<Buffer>,
         cx: &mut Context<Self>,
     ) {
+        if !self.worktree_store.read(cx).is_scanning_enabled() {
+            return;
+        }
         // If the buffer has a language, set it and start the language server if we haven't already.
         let buffer = buffer_handle.read(cx);
         let Some(file) = buffer.file() else {

@@ -847,9 +847,11 @@ fn main() {
 
         let fs = app_state.fs.clone();
         load_user_themes_in_background(fs.clone(), cx);
-        watch_themes(fs.clone(), cx);
-        #[cfg(debug_assertions)]
-        watch_languages(fs.clone(), app_state.languages.clone(), cx);
+        if fs.is_fake() {
+            watch_themes(fs.clone(), cx);
+            #[cfg(debug_assertions)]
+            watch_languages(fs.clone(), app_state.languages.clone(), cx);
+        }
 
         let menus = app_menus(cx);
         cx.set_menus(menus);

@@ -4637,10 +4637,21 @@ impl ProjectPanel {
         let hide_hidden = settings.hide_hidden;
 
         let visible_entries_task = cx.spawn_in(window, async move |this, cx| {
-            let new_state = cx
+            let (new_state, unloaded_roots_to_expand) = cx
                 .background_spawn(async move {
+                    let mut unloaded_roots_to_expand = Vec::new();
                     for worktree_snapshot in visible_worktrees {
                         let worktree_id = worktree_snapshot.id();
+
+                        if let hash_map::Entry::Vacant(e) =
+                            new_state.expanded_dir_ids.entry(worktree_id)
+                            && let Some(entry) = worktree_snapshot.root_entry()
+                        {
+                            if entry.kind.is_unloaded() {
+                                unloaded_roots_to_expand.push((worktree_id, entry.id));
+                            }
+                            e.insert(vec![entry.id]);
+                        }
 
                         let mut new_entry_parent_id = None;
                         let mut new_entry_kind = EntryKind::Dir;
@@ -4827,19 +4838,10 @@ impl ProjectPanel {
                                 }
                             }
 
-                            let expanded_dir_ids =
-                                match new_state.expanded_dir_ids.entry(worktree_id) {
-                                    hash_map::Entry::Occupied(e) => e.into_mut(),
-                                    hash_map::Entry::Vacant(e) => {
-                                        // The first time a worktree's root entry becomes available,
-                                        // mark that root entry as expanded.
-                                        if let Some(entry) = worktree_snapshot.root_entry() {
-                                            e.insert(vec![entry.id]).as_slice()
-                                        } else {
-                                            &[]
-                                        }
-                                    }
-                                };
+                            let expanded_dir_ids = new_state
+                                .expanded_dir_ids
+                                .get(&worktree_id)
+                                .map_or(&[][..], Vec::as_slice);
 
                             if expanded_dir_ids.binary_search(&entry.id).is_err()
                                 && entry_iter.advance_to_sibling()
@@ -4880,11 +4882,18 @@ impl ProjectPanel {
                             new_state.max_width_item_index = Some(visited_worktrees_length + index);
                         }
                     }
-                    new_state
+                    (new_state, unloaded_roots_to_expand)
                 })
                 .await;
             this.update_in(cx, |this, window, cx| {
                 this.state = new_state;
+                for (worktree_id, root_entry_id) in unloaded_roots_to_expand {
+                    if let Some(task) = this.project.update(cx, |project, cx| {
+                        project.expand_entry(worktree_id, root_entry_id, cx)
+                    }) {
+                        task.detach_and_log_err(cx);
+                    }
+                }
                 if let Some((worktree_id, entry_id)) = new_selected_entry {
                     this.selection = Some(SelectedEntry {
                         worktree_id,

@@ -459,15 +459,7 @@ impl ExtensionStore {
                 }
             })
             .shared();
-        this.initial_index_load = initial_index_load.clone();
-
-        cx.spawn(async move |this, cx| {
-            initial_index_load.await;
-            this.update(cx, |this, cx| this.auto_install_extensions(cx))
-                .ok();
-            this.update(cx, |this, cx| this.check_for_updates(cx)).ok();
-        })
-        .detach();
+        this.initial_index_load = initial_index_load;
 
         // Perform all extension loading in a single task to ensure that we
         // never attempt to simultaneously load/unload extensions from multiple
@@ -508,31 +500,30 @@ impl ExtensionStore {
             .await;
         }));
 
-        // Watch the installed extensions directory for changes. Whenever changes are
-        // detected, rebuild the extension index, and load/unload any extensions that
-        // have been added, removed, or modified.
-        this.tasks.push(cx.background_spawn({
-            let fs = this.fs.clone();
-            let reload_tx = this.reload_tx.clone();
-            let installed_dir = this.installed_dir.clone();
-            async move {
-                let (mut paths, _) = fs.watch(&installed_dir, FS_WATCH_LATENCY).await;
-                while let Some(events) = paths.next().await {
-                    for event in events {
-                        let Ok(event_path) = event.path.strip_prefix(&installed_dir) else {
-                            continue;
-                        };
+        if this.fs.is_fake() {
+            this.tasks.push(cx.background_spawn({
+                let fs = this.fs.clone();
+                let reload_tx = this.reload_tx.clone();
+                let installed_dir = this.installed_dir.clone();
+                async move {
+                    let (mut paths, _) = fs.watch(&installed_dir, FS_WATCH_LATENCY).await;
+                    while let Some(events) = paths.next().await {
+                        for event in events {
+                            let Ok(event_path) = event.path.strip_prefix(&installed_dir) else {
+                                continue;
+                            };
 
-                        if let Some(path::Component::Normal(extension_dir_name)) =
-                            event_path.components().next()
-                            && let Some(extension_id) = extension_dir_name.to_str()
-                        {
-                            reload_tx.unbounded_send(Some(extension_id.into())).ok();
+                            if let Some(path::Component::Normal(extension_dir_name)) =
+                                event_path.components().next()
+                                && let Some(extension_id) = extension_dir_name.to_str()
+                            {
+                                reload_tx.unbounded_send(Some(extension_id.into())).ok();
+                            }
                         }
                     }
                 }
-            }
-        }));
+            }));
+        }
 
         this
     }

@@ -195,16 +195,17 @@ pub struct PromptBuilder {
 
 impl PromptBuilder {
     pub fn load(fs: Arc<dyn Fs>, stdout_is_a_pty: bool, cx: &mut App) -> Arc<Self> {
-        Self::new(Some(PromptLoadingParams {
+        let loading_params = fs.is_fake().then(|| PromptLoadingParams {
             fs: fs.clone(),
             repo_path: stdout_is_a_pty
                 .then(|| std::env::current_dir().log_err())
                 .flatten(),
             cx,
-        }))
-        .log_err()
-        .map(Arc::new)
-        .unwrap_or_else(|| Arc::new(Self::new(None).unwrap()))
+        });
+        Self::new(loading_params)
+            .log_err()
+            .map(Arc::new)
+            .unwrap_or_else(|| Arc::new(Self::new(None).unwrap()))
     }
 
     pub fn new(loading_params: Option<PromptLoadingParams>) -> Result<Self> {

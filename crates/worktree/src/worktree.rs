@@ -1356,7 +1356,7 @@ impl LocalWorktree {
         let fs = self.fs.clone();
         let scanning_enabled = self.scanning_enabled;
         let force_defer_watch = self.force_defer_watch;
-        let track_git_repositories = self.visible;
+        let track_git_repositories = self.visible && self.scanning_enabled;
         let settings = self.settings.clone();
         let (scan_states_tx, mut scan_states_rx) = mpsc::unbounded();
         let background_scanner = cx.background_spawn({
@@ -3350,7 +3350,7 @@ impl BackgroundScannerState {
 
     async fn insert_entry(&mut self, entry: Entry, fs: &dyn Fs, watcher: &dyn Watcher) -> Entry {
         let entry = self.snapshot.insert_entry(entry, fs).await;
-        if entry.path.file_name() == Some(&DOT_GIT) {
+        if self.scanning_enabled && entry.path.file_name() == Some(&DOT_GIT) {
             self.insert_git_repository(entry.path.clone(), fs, watcher)
                 .await;
         }
@@ -4534,7 +4534,7 @@ impl BackgroundScanner {
 
         self.send_status_update(false, SmallVec::new(), &[]).await;
 
-        if self.defer_watch {
+        if self.defer_watch && scanning_enabled {
             let (events, watcher) = self
                 .fs
                 .watch(root_abs_path.as_path(), FS_WATCH_LATENCY)
@@ -4592,7 +4592,12 @@ impl BackgroundScanner {
         // Continue processing events until the worktree is dropped.
         self.phase = BackgroundScannerPhase::Events;
 
-        let root_path_check_timer = self.executor.timer(ROOT_PATH_CHECK_INTERVAL).fuse();
+        let root_path_check_timer = if scanning_enabled {
+            futures::future::Either::Left(self.executor.timer(ROOT_PATH_CHECK_INTERVAL))
+        } else {
+            futures::future::Either::Right(futures::future::pending())
+        }
+        .fuse();
         futures::pin_mut!(root_path_check_timer);
         let mut root_path_missing = false;
 
@@ -4662,7 +4667,14 @@ impl BackgroundScanner {
                             }
                         }
                     }
-                    root_path_check_timer.set(self.executor.timer(ROOT_PATH_CHECK_INTERVAL).fuse());
+                    if scanning_enabled {
+                        root_path_check_timer.set(
+                            futures::future::Either::Left(
+                                self.executor.timer(ROOT_PATH_CHECK_INTERVAL),
+                            )
+                            .fuse(),
+                        );
+                    }
                 }
             }
         }
@@ -6311,9 +6323,10 @@ impl BackgroundScanner {
             && (!(entry.is_ignored || beyond_scan_depth) || entry.is_always_included);
 
         scannable
-            || entry.path.file_name() == Some(DOT_GIT)
-            || entry.path.file_name() == Some(local_settings_folder_name())
-            || entry.path.file_name() == Some(local_vscode_folder_name())
+            || (state.scanning_enabled
+                && (entry.path.file_name() == Some(DOT_GIT)
+                    || entry.path.file_name() == Some(local_settings_folder_name())
+                    || entry.path.file_name() == Some(local_vscode_folder_name())))
             || state.scanned_dirs.contains(&entry.id) // If we've ever scanned it, keep scanning
             || state
                 .paths_to_scan

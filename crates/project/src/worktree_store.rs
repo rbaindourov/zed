@@ -259,7 +259,7 @@ impl WorktreeStore {
             loading_worktrees: Default::default(),
             downstream_client: None,
             worktrees: Vec::new(),
-            scanning_enabled: true,
+            scanning_enabled: false,
             retain_worktrees,
             initial_scan_complete: watch::channel_with(true),
             state: WorktreeStoreState::Local { fs },
@@ -279,7 +279,7 @@ impl WorktreeStore {
             loading_worktrees: Default::default(),
             downstream_client: None,
             worktrees: Vec::new(),
-            scanning_enabled: true,
+            scanning_enabled: false,
             retain_worktrees,
             initial_scan_complete: watch::channel_with(true),
             state: WorktreeStoreState::Remote {
@@ -318,6 +318,10 @@ impl WorktreeStore {
     pub fn disable_scanner(&mut self) {
         self.scanning_enabled = false;
         *self.initial_scan_complete.0.borrow_mut() = true;
+    }
+
+    pub fn is_scanning_enabled(&self) -> bool {
+        self.scanning_enabled
     }
 
     /// Returns a future that resolves when all visible worktrees have completed
