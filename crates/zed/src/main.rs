@@ -644,6 +644,11 @@ fn main() {
 
         copilot_ui::init(&app_state, cx);
         language_model::init(cx);
+        RefreshLlmTokenListener::register(
+            app_state.client.clone(),
+            app_state.user_store.clone(),
+            cx,
+        );
         language_models::init(app_state.user_store.clone(), app_state.client.clone(), cx);
         acp_tools::init(cx);
         zed::telemetry_log::init(cx);

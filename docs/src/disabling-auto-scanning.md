@@ -53,7 +53,7 @@ In this fork, all automatic scanning is disabled by default in favor of **strict
   - Hardcoded `TelemetrySettings` (`diagnostics: false`, `metrics: false`, `anthropic_retention: false`) and disabled `should_install_crash_handler`, `Telemetry::report_event`, and `Telemetry::flush_events_inner` so zero telemetry or crash reports are queued or transmitted.
   - Short-circuited `Client::has_credentials`, `Client::sign_in`, `Client::sign_in_with_optional_connect`, `Client::connect`, and `Client::connect_to_cloud` so the editor never reads/writes cloud keychain tokens or opens WebSocket connections to Zed's cloud servers.
 - **`crates/zed/src/main.rs` & `crates/zed/src/zed.rs` & `crates/collab_ui/src/panel_settings.rs`**:
-  - Removed startup calls to `telemetry.start(...)`, `telemetry.flush_events()`, `auto_update::init(...)`, `auto_update_ui::init(...)`, `reliability::init(...)` (30-second `sysinfo` memory polling and minidump uploading), `RefreshLlmTokenListener::register(...)`, and `authenticate(...)`.
+  - Removed startup calls to `telemetry.start(...)`, `telemetry.flush_events()`, `auto_update::init(...)`, `auto_update_ui::init(...)`, `reliability::init(...)` (30-second `sysinfo` memory polling and minidump uploading), and `authenticate(...)`.
   - Removed the 5-minute `TELEMETRY_INTERVAL` input/frame latency reporting loop, workspace `initialize_file_watcher` (`inotify_init`), the status-bar Zeta `EditPredictionButton`, and the `CollabPanel` (`channels_panel`) dock registration.
 
 ---
