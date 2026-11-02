@@ -29,11 +29,10 @@ In this fork, all automatic scanning is disabled by default in favor of **strict
   - `GitStore::local`: Skips spawning file watchers on `~/.config/zed/git/config` and `~/.gitconfig` when `is_scanning_enabled()` is `false`.
   - `GitStore::update_repositories_from_worktree` & `Repository::schedule_scan`: Returns early when `is_scanning_enabled()` is `false`, preventing background `git status` subprocesses and `.git/index` lock contention.
 
-### 2.3 Language Detection, Tree-Sitter Parsing, and LSP Auto-Start
+### 2.3 LSP Auto-Start Disabled (Per-Buffer Syntax Highlighting Retained)
 - **`crates/project/src/lsp_store.rs`**:
   - `LspStore::new_local`: Initializes `auto_start_language_servers` to `worktree_store.read(cx).is_scanning_enabled()` (`false`), preventing language servers (`rust-analyzer`, `tsserver`, `pyright`, etc.) from automatically spawning and indexing the workspace.
-  - `LspStore::on_buffer_added` & `LspStore::detect_language_for_buffer`: Skips automatic modeline parsing and automatic language/grammar detection when `is_scanning_enabled()` is `false`. Opened files render immediately as plain text without triggering background Tree-sitter parses (`Buffer::reparse`).
-  - Manual override remains available: selecting a language via the Language Selector UI (`language_selector::Toggle` -> `Project::set_language_for_buffer`) loads the grammar for that specific buffer on demand, and running `editor: restart language server` explicitly starts a language server using `LanguageServerStartMode::Explicit`.
+  - Per-buffer language detection (`LspStore::detect_language_for_buffer`) and Tree-sitter syntax highlighting remain enabled on opened buffers without starting any background LSP servers. Running `editor: restart language server` explicitly starts a language server using `LanguageServerStartMode::Explicit`.
 
 ### 2.4 Startup Directory Watchers & Extension Auto-Installers
 - **`crates/extension_host/src/extension_host.rs`**:
@@ -64,8 +63,8 @@ In this fork, all automatic scanning is disabled by default in favor of **strict
 | :--- | :--- | :--- |
 | **Direct File Open (`zed path/to/file`)** | **Retained (Instant)** | Loads only the target file and its immediate ancestor path chain via `LocalWorktree::load_file`. |
 | **Project Panel Root & Folder Expansion** | **On-Demand (1-Level Shallow)** | Root directory loads only its immediate children on open; clicking any subfolder loads only that single directory level. |
-| **Buffer Editing & Saving** | **Retained (Instant)** | Zero background Tree-sitter or LSP overhead on open; files open immediately as plain text. |
-| **Syntax Highlighting (Tree-Sitter)** | **Manual On-Demand** | Disabled on automatic file open; enabled per-buffer only when manually selecting a language in the Language Selector (`Ctrl+Shift+L` / Command Palette: `language selector: toggle`). |
+| **Buffer Editing & Saving** | **Retained (Instant)** | Zero background LSP indexing overhead on open. |
+| **Syntax Highlighting (Tree-Sitter)** | **Retained (Per-Buffer)** | Automatically detects language and highlights only the open file without starting LSP servers. |
 | **Language Servers (LSP)** | **Manual On-Demand** | Automatic LSP startup is disabled; can be started manually via Command Palette (`editor: restart language server`). |
 | **Fuzzy File Finder (`Ctrl+P` / `Cmd+P`)** | **Scoped to Loaded Entries** | Searches only already-opened files and directories that have been expanded in the Project Panel. |
 | **Project-Wide Search (`Ctrl+Shift+F`)** | **Scoped to Loaded Entries** | Searches only opened buffers and expanded directories in the worktree snapshot. |
