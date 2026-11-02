@@ -45,6 +45,17 @@ In this fork, all automatic scanning is disabled by default in favor of **strict
 - **`crates/agent/src/agent.rs`**:
   - Skips spawning the persistent `run_skills_watch` watcher on `~/.agents/skills`.
 
+### 2.5 Cloud Sign-In, Collaboration, Telemetry, and Auto-Update Stripping
+- **`crates/title_bar/src/title_bar.rs`**:
+  - Removed the `Sign In` button, `"Signing in…"` indicator, collaborator facepile (`render_collaborator_list`), voice call controls (`render_call_controls`), cloud connection status (`render_connection_status`), and auto-update banner (`update_version`) from `TitleBar::render`.
+  - Stripped cloud account, organization switcher, and `Sign Out` items from `TitleBar::render_user_menu_button`, leaving only local settings, keymap, themes, extensions, and layout controls.
+- **`crates/client/src/client.rs` & `crates/client/src/telemetry.rs`**:
+  - Hardcoded `TelemetrySettings` (`diagnostics: false`, `metrics: false`, `anthropic_retention: false`) and disabled `should_install_crash_handler`, `Telemetry::report_event`, and `Telemetry::flush_events_inner` so zero telemetry or crash reports are queued or transmitted.
+  - Short-circuited `Client::has_credentials`, `Client::sign_in`, `Client::sign_in_with_optional_connect`, `Client::connect`, and `Client::connect_to_cloud` so the editor never reads/writes cloud keychain tokens or opens WebSocket connections to Zed's cloud servers.
+- **`crates/zed/src/main.rs` & `crates/zed/src/zed.rs` & `crates/collab_ui/src/panel_settings.rs`**:
+  - Removed startup calls to `telemetry.start(...)`, `telemetry.flush_events()`, `auto_update::init(...)`, `auto_update_ui::init(...)`, `reliability::init(...)` (30-second `sysinfo` memory polling and minidump uploading), `RefreshLlmTokenListener::register(...)`, and `authenticate(...)`.
+  - Removed the 5-minute `TELEMETRY_INTERVAL` input/frame latency reporting loop, workspace `initialize_file_watcher` (`inotify_init`), the status-bar Zeta `EditPredictionButton`, and the `CollabPanel` (`channels_panel`) dock registration.
+
 ---
 
 ## 3. Feature Impact Reference
@@ -60,3 +71,4 @@ In this fork, all automatic scanning is disabled by default in favor of **strict
 | **Project-Wide Search (`Ctrl+Shift+F`)** | **Scoped to Loaded Entries** | Searches only opened buffers and expanded directories in the worktree snapshot. |
 | **Live External FS Watcher (`inotify`)** | **Disabled** | External file changes do not trigger automatic background rescans; collapse and re-expand a folder to refresh its entries. |
 | **Automatic Git Status & Diff Gutters** | **Disabled** | Background `.git` discovery and `git status` polling are disabled. |
+| **Cloud Sign-In, Collab, Telemetry & Auto-Update** | **Stripped** | Sign In UI, Collab Panel, cloud WebSocket connections, telemetry uploads, crash/minidump uploads, and background auto-update polling are completely removed. |

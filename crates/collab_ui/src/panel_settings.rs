@@ -14,7 +14,7 @@ impl Settings for CollaborationPanelSettings {
         let panel = content.collaboration_panel.as_ref().unwrap();
 
         Self {
-            button: panel.button.unwrap(),
+            button: false,
             dock: panel.dock.unwrap().into(),
             default_width: panel.default_width.unwrap().into_gpui(),
         }

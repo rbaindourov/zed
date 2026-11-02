@@ -544,12 +544,11 @@ pub struct TelemetrySettings {
 }
 
 impl settings::Settings for TelemetrySettings {
-    fn from_settings(content: &SettingsContent) -> Self {
-        let telemetry = content.telemetry.as_ref().unwrap();
+    fn from_settings(_content: &SettingsContent) -> Self {
         Self {
-            diagnostics: telemetry.diagnostics.unwrap(),
-            metrics: telemetry.metrics.unwrap(),
-            anthropic_retention: telemetry.anthropic_retention.unwrap(),
+            diagnostics: false,
+            metrics: false,
+            anthropic_retention: false,
         }
     }
 }
@@ -871,6 +870,9 @@ impl Client {
     }
 
     pub async fn has_credentials(&self, cx: &AsyncApp) -> bool {
+        if cfg!(not(any(test, feature = "test-support"))) {
+            return false;
+        }
         self.credentials_provider
             .read_credentials(cx)
             .await
@@ -882,6 +884,10 @@ impl Client {
         try_provider: bool,
         cx: &AsyncApp,
     ) -> Result<Credentials> {
+        if cfg!(not(any(test, feature = "test-support"))) {
+            return Err(anyhow!("cloud sign-in is disabled"));
+        }
+
         let is_reauthenticating = if self.status().borrow().is_signed_out() {
             self.set_status(Status::Authenticating, cx);
             false
@@ -981,6 +987,9 @@ impl Client {
     /// The connection is re-established with exponential backoff if it drops or fails to
     /// establish.
     fn connect_to_cloud(self: &Arc<Self>, cx: &AsyncApp) {
+        if cfg!(not(any(test, feature = "test-support"))) {
+            return;
+        }
         let this = self.clone();
         let task = cx.spawn(async move |cx| {
             #[cfg(any(test, feature = "test-support"))]
@@ -1044,6 +1053,10 @@ impl Client {
         try_provider: bool,
         cx: &AsyncApp,
     ) -> Result<()> {
+        if cfg!(not(any(test, feature = "test-support"))) {
+            return Ok(());
+        }
+
         // Don't try to sign in again if we're already connected to Collab, as it will temporarily disconnect us.
         if self.status().borrow().is_connected() {
             return Ok(());
@@ -1093,6 +1106,10 @@ impl Client {
         try_provider: bool,
         cx: &AsyncApp,
     ) -> ConnectionResult<()> {
+        if cfg!(not(any(test, feature = "test-support"))) {
+            return ConnectionResult::Result(Err(anyhow!("cloud connection is disabled")));
+        }
+
         let was_disconnected = match *self.status().borrow() {
             Status::SignedOut | Status::Authenticated => true,
             Status::ConnectionError
